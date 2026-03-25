@@ -11,20 +11,24 @@ extern TIM_HandleTypeDef htim2; // 定时器2的句柄，记得在main.c里定�
 */
 void user_delaynus_tim(uint32_t nus)
 {
-    // 限制最大延时 65535us（防止溢出）
-    if(nus > 65535) nus = 65535;
+    uint32_t ticks;
+    uint32_t told, tnow, tcnt = 0;
+    uint32_t reload = SysTick->LOAD;        // 读取 SysTick 自动重装载值
 
-    // 重置计数器
-    __HAL_TIM_SET_COUNTER(&htim2, 0);
+    ticks = nus * (SystemCoreClock / 1000000);  // 计算需要的节拍数
 
-    // 开启定时器
-    HAL_TIM_Base_Start(&htim2);
-
-    // 等待计时到达（阻塞，但不影响中断）
-    while(__HAL_TIM_GET_COUNTER(&htim2) < nus);
-
-    // 关闭定时器
-    HAL_TIM_Base_Stop(&htim2);
+    told = SysTick->VAL;                 // 刚进入时的计数器值
+    while (1)
+    {
+        tnow = SysTick->VAL;
+        if (tnow != told)
+        {
+            if (tnow < told) tcnt += told - tnow;
+            else tcnt += reload - tnow + told;
+            told = tnow;
+            if (tcnt >= ticks) break;    // 时间到达
+        }
+    }
 }
 /*
     普通定时器实现ms延时，可直接使用HAL库函数HAL_delay（）
@@ -99,7 +103,7 @@ uint8_t DHT11_Read_Data(DHT11_DataTypeDef *DHT11_Data)
 
     // 1. 发送起始信号：STM32主动“打招呼”
     DHT11_OUT_LOW();        // 拉低总线
-    HAL_Delay(20);           // 保持20毫秒（满足至少18毫秒的要求，多等2毫秒更稳妥）
+    delay_ms_tim(20);           // 保持20毫秒（满足至少18毫秒的要求，多等2毫秒更稳妥）
     DHT11_OUT_HIGH();       // 拉高总线
     user_delaynus_tim(30);           // 保持30微秒（在20-40微秒范围内）
 

@@ -25,7 +25,15 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "DHT11.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/_intsup.h>
+#include "stm32f1xx_hal.h" 
+extern UART_HandleTypeDef huart1;  // 声明外部UART句柄，记得在main.c里定义并初始化它
+extern ADC_HandleTypeDef hadc1;      // 声明外部ADC句柄，记得在main.c里定义并初始化它
+extern ADC_HandleTypeDef hadc2;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,7 +43,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,7 +59,33 @@ osThreadId_t DHT11TaskHandle;
 const osThreadAttr_t DHT11Task_attributes = {
   .name = "DHT11Task",
   .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal1,
+};
+/* Definitions for LightTask */
+osThreadId_t LightTaskHandle;
+const osThreadAttr_t LightTask_attributes = {
+  .name = "LightTask",
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for SendMassage */
+osThreadId_t SendMassageHandle;
+const osThreadAttr_t SendMassage_attributes = {
+  .name = "SendMassage",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for RainTask */
+osThreadId_t RainTaskHandle;
+const osThreadAttr_t RainTask_attributes = {
+  .name = "RainTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal2,
+};
+/* Definitions for LoRAMsgQueue */
+osMessageQueueId_t LoRAMsgQueueHandle;
+const osMessageQueueAttr_t LoRAMsgQueue_attributes = {
+  .name = "LoRAMsgQueue"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,6 +94,9 @@ const osThreadAttr_t DHT11Task_attributes = {
 /* USER CODE END FunctionPrototypes */
 
 void StartDHT11Task(void *argument);
+void StartLightTask(void *argument);
+void StartSendMassageTask(void *argument);
+void StartRainTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -86,6 +122,10 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of LoRAMsgQueue */
+  LoRAMsgQueueHandle = osMessageQueueNew (10, 30, &LoRAMsgQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -93,6 +133,15 @@ void MX_FREERTOS_Init(void) {
   /* Create the thread(s) */
   /* creation of DHT11Task */
   DHT11TaskHandle = osThreadNew(StartDHT11Task, NULL, &DHT11Task_attributes);
+
+  /* creation of LightTask */
+  LightTaskHandle = osThreadNew(StartLightTask, NULL, &LightTask_attributes);
+
+  /* creation of SendMassage */
+  SendMassageHandle = osThreadNew(StartSendMassageTask, NULL, &SendMassage_attributes);
+
+  /* creation of RainTask */
+  RainTaskHandle = osThreadNew(StartRainTask, NULL, &RainTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -114,12 +163,142 @@ void MX_FREERTOS_Init(void) {
 void StartDHT11Task(void *argument)
 {
   /* USER CODE BEGIN StartDHT11Task */
+
+
+  DHT11_DataTypeDef dht11_data;
+  char buffer[25];  // 用来存储格式化的字符串，方便打印调试信息
+  char buffer1[25];
+  uint8_t read_success;  // 标志位，表示读取是否成功
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+
+    
+    taskENTER_CRITICAL();   // 进入安全临界区
+    read_success = DHT11_Read_Data(&dht11_data);
+    taskEXIT_CRITICAL();    // 退出临界区
+
+
+    if(read_success == 0)  // 读取成功，函数返回0
+
+    {
+
+        // 读取成功！这里可以加打印代码，或者把数据用到其他地方
+        sprintf(buffer, "Humidity: %d%%\r\n", dht11_data.humidity_int);
+        sprintf(buffer1,"Temperature:%dC\r\n", dht11_data.temp_int);
+        osMessageQueuePut(LoRAMsgQueueHandle, &buffer, 0, osWaitForever);  // 把DHT11数据放到消息队列里，等待发送任务取走发送
+        osMessageQueuePut(LoRAMsgQueueHandle, &buffer1, 0, osWaitForever);
+        //HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+    
+    }
+
+
+    else
+    {
+
+      //HAL_UART_Transmit(&huart1, (uint8_t*)"DHT11 Read Failed!\r\n", 22, HAL_MAX_DELAY);
+        // 读取失败，可以加个提示，或者让系统重试
+        osMessageQueuePut(LoRAMsgQueueHandle, (uint8_t*)"DHT11 Read Failed!", 0, osWaitForever);  // 把DHT11数据放到消息队列里，等待发送任务取走发送
+
+    }
+
+
+    osDelay(1000);  // 每隔1秒读取一次，别太频繁了，DHT11需要时间来稳定数据
   }
   /* USER CODE END StartDHT11Task */
+}
+
+/* USER CODE BEGIN Header_StartLightTask */
+/**
+* @brief Function implementing the LightTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLightTask */
+void StartLightTask(void *argument)
+{
+  /* USER CODE BEGIN StartLightTask */
+
+  int lightresult = 0;
+  int voltage = 0;
+  char send_buf_light[25];
+  HAL_ADC_Start(&hadc1);
+
+
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(500);
+    lightresult = HAL_ADC_GetValue(&hadc1);
+    voltage = lightresult * 3300 / 4095;
+
+    sprintf(send_buf_light, "Light:%d;%d.%03dV\r\n", lightresult, voltage / 1000, voltage % 1000);
+    osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_light, 0, osWaitForever);  // 把光照强度数据放到消息队列里，等待发送任务取走发送
+    //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_light, strlen(send_buf_light), 20);
+
+
+  }
+  /* USER CODE END StartLightTask */
+}
+
+/* USER CODE BEGIN Header_StartSendMassageTask */
+/**
+* @brief Function implementing the SendMassage thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSendMassageTask */
+void StartSendMassageTask(void *argument)
+{
+  /* USER CODE BEGIN StartSendMassageTask */
+  uint8_t send_buf[25];
+
+
+  /* Infinite loop */
+  for(;;)
+  {
+    osMessageQueueGet(LoRAMsgQueueHandle, &send_buf, 0, osWaitForever);
+    HAL_UART_Transmit(&huart1, (uint8_t*)send_buf, strlen((char*)send_buf), HAL_MAX_DELAY);  // 从消息队列里取数据发送出去，发送完了就等下一条消息
+
+    osDelay(50);  
+
+  }
+  /* USER CODE END StartSendMassageTask */
+}
+
+/* USER CODE BEGIN Header_StartRainTask */
+/**
+* @brief Function implementing the RainTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRainTask */
+void StartRainTask(void *argument)
+{
+  /* USER CODE BEGIN StartRainTask */
+
+  int rainresult = 0;
+  int voltage = 0;
+  char send_buf_rain[25];
+  HAL_ADC_Start(&hadc2);
+
+
+  /* Infinite loop */
+  for(;;)
+  {
+    //HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_5);
+    osDelay(1000);
+    rainresult = HAL_ADC_GetValue(&hadc2);
+    voltage = rainresult * 3300 / 4095;
+
+    sprintf(send_buf_rain, "Rain:%d,%d.%03dV\r\n", rainresult, voltage / 1000, voltage % 1000);
+    osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_rain, 0, osWaitForever);  // 把雨滴传感器数据放到消息队列里，等待发送任务取走发送
+    //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_rain, strlen(send_buf_rain), 20);
+
+
+  }
+  /* USER CODE END StartRainTask */
 }
 
 /* Private application code --------------------------------------------------*/
