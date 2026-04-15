@@ -20,8 +20,8 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
-#include "dma.h"
 #include "i2c.h"
+#include "stm32f1xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -93,14 +93,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
+ // __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
 
 
   /* USER CODE END 2 */
@@ -108,7 +108,7 @@ int main(void)
   /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
-
+  HAL_UART_Transmit(&huart1,"hello", 5, 1000);
   /* Start scheduler */
   osKernelStart();
 

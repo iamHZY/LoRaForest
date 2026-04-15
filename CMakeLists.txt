@@ -35,6 +35,8 @@ enable_language(C ASM)
 add_executable(${CMAKE_PROJECT_NAME}
     # Add user defined sources here
     ./Core/Src/DHT11.c
+
+    ./Core/Src/bmp280.c
 )
 
 # Add STM32CubeMX generated sources

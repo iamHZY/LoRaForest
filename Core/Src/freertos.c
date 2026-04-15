@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "DHT11.h"
+#include "bmp280.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -82,6 +83,13 @@ const osThreadAttr_t RainTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal2,
 };
+/* Definitions for pressureTask */
+osThreadId_t pressureTaskHandle;
+const osThreadAttr_t pressureTask_attributes = {
+  .name = "pressureTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for LoRAMsgQueue */
 osMessageQueueId_t LoRAMsgQueueHandle;
 const osMessageQueueAttr_t LoRAMsgQueue_attributes = {
@@ -97,6 +105,7 @@ void StartDHT11Task(void *argument);
 void StartLightTask(void *argument);
 void StartSendMassageTask(void *argument);
 void StartRainTask(void *argument);
+void StartpressureTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -142,6 +151,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of RainTask */
   RainTaskHandle = osThreadNew(StartRainTask, NULL, &RainTask_attributes);
+
+  /* creation of pressureTask */
+  pressureTaskHandle = osThreadNew(StartpressureTask, NULL, &pressureTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -299,6 +311,47 @@ void StartRainTask(void *argument)
 
   }
   /* USER CODE END StartRainTask */
+}
+
+/* USER CODE BEGIN Header_StartpressureTask */
+/**
+* @brief Function implementing the pressureTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartpressureTask */
+void StartpressureTask(void *argument)
+{
+  /* USER CODE BEGIN StartpressureTask */
+  uint8_t tx_buffer[25];
+  int32_t temp_c;
+	int32_t press_pa;
+  int len;
+  BMP280_Init();
+  /* Infinite loop */
+  for(;;)
+  {
+    BMP280_Read(&temp_c, &press_pa);
+    if (temp_c >= 0)
+    {
+      len = snprintf(tx_buffer, sizeof(tx_buffer),
+                "Press: %ld.%02ld hPa\r\n",
+                press_pa / 100, press_pa % 100);
+    }
+
+
+	else// 负数：先取绝对值，再手动加负号
+    {
+      
+      int32_t t_abs = -temp_c;
+      len = snprintf(tx_buffer, sizeof(tx_buffer),
+              "Press: %ld.%02ld hPa\r\n",
+              press_pa / 100, press_pa % 100);
+    }
+    osMessageQueuePut(LoRAMsgQueueHandle, &tx_buffer, 0, osWaitForever);  // 把BMP280数据放到消息队列里，等待发送任务取走发送
+    osDelay(500);
+  }
+  /* USER CODE END StartpressureTask */
 }
 
 /* Private application code --------------------------------------------------*/

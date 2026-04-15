@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 // 这里要划重点！根据自己的硬件修改引脚（默认是GPIOB的Pin12）
-#define DHT11_GPIO_PORT    GPIOA       // 传感器连接的GPIO端口
-#define DHT11_GPIO_PIN     GPIO_PIN_15 // 传感器连接的GPIO引脚
+#define DHT11_GPIO_PORT    GPIOF       // 传感器连接的GPIO端口
+#define DHT11_GPIO_PIN     GPIO_PIN_5 // 传感器连接的GPIO引脚
 
 // 存储温湿度数据的“小盒子”，把有用的信息都装进去
 typedef struct {
