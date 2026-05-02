@@ -46,13 +46,16 @@ async function getAvailabelPorts() {
 
 async function openSeialPort() {
     let portlist = document.getElementById("port") as HTMLSelectElement;
+    let btndiv = document.getElementById("button-area") as HTMLDivElement;
+    let connectButton = document.getElementById("connectActionBtn") as HTMLButtonElement;
+    let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
     let port = portlist.options[portlist.selectedIndex].text;
     if (!isConnect.value){
         if (await invoke("start_reading", {port: port})){
-        //alert(port + "打开成功");
             isConnect.value = true;
-            let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
             connectStatus.textContent = "已连接"
+            connectButton.textContent = "断开"
+            btndiv.hidden = true;
         }else{
             alert(port + "打开失败");
         }
@@ -68,60 +71,63 @@ init();
 </script>
 
 <template>
-<body>
-<div class="app-fullscreen">
-    <!-- 环境参数监测区域: 没有groupbox，没有容器边框 -->
-    <div class="sensors-area">
-        <div class="param-header">环境参数实时监测</div>
-        
-        <!-- 传感器网格 6项: 光照/降雨/气温/气压/风速/湿度 -->
-        <div class="sensor-grid">
-            <div class="sensor-card">
-                <div class="sensor-label">💡 光照强度 (Lux)</div>
-                <input type="text" v-model="lightVal" class="sensor-value" id="lightVal" readonly placeholder="—">
+    <body>
+    <div class="app-fullscreen">
+        <!-- 环境参数监测区域: 没有groupbox，没有容器边框 -->
+        <div class="sensors-area">
+            <div class="param-header">环境参数实时监测</div>
+            
+            <!-- 传感器网格 6项: 光照/降雨/气温/气压/风速/湿度 -->
+            <div class="sensor-grid">
+                <div class="sensor-card">
+                    <div class="sensor-label">光照强度 (Lux)</div>
+                    <input type="text" v-model="lightVal" class="sensor-value" id="lightVal" readonly placeholder="—">
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">降雨量 (mm/h)</div>
+                    <input type="text" v-model="rainVal" class="sensor-value" id="rainVal" readonly placeholder="—">
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">气温 (°C)</div>
+                    <input type="text" v-model="tempVal" class="sensor-value" id="tempVal" readonly placeholder="—">
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">气压 (hPa)</div>
+                    <input type="text" v-model="presVal" class="sensor-value" id="pressureVal" readonly placeholder="—">
+                </div>
+                <div class="sensor-card">
+                    <div class="sensor-label">空气湿度 (%)</div>
+                    <input type="text" v-model="humiVal" class="sensor-value" id="humidityVal" readonly placeholder="—">
+                </div>
             </div>
-            <div class="sensor-card">
-                <div class="sensor-label">🌧️ 降雨量 (mm/h)</div>
-                <input type="text" v-model="rainVal" class="sensor-value" id="rainVal" readonly placeholder="—">
-            </div>
-            <div class="sensor-card">
-                <div class="sensor-label">🌡️ 气温 (°C)</div>
-                <input type="text" v-model="tempVal" class="sensor-value" id="tempVal" readonly placeholder="—">
-            </div>
-            <div class="sensor-card">
-                <div class="sensor-label">⏲️ 气压 (hPa)</div>
-                <input type="text" v-model="presVal" class="sensor-value" id="pressureVal" readonly placeholder="—">
-            </div>
-            <div class="sensor-card">
-                <div class="sensor-label">💧 空气湿度 (%)</div>
-                <input type="text" v-model="humiVal" class="sensor-value" id="humidityVal" readonly placeholder="—">
-            </div>
-        </div>
 
-        <div>
-            <lable for="port">串口</lable>
-            <select id="port"></select>
-        </div>
-        
-        <!-- 状态栏和连接按钮 (无背景框) -->
-        <div class="control-bar">
-            <div class="status-text">
-                📡 状态: <span id="connStatus">未连接</span>
+            <div class="serial-port-text">
+                <lable for="port">串口</lable>
+                <select id="port"></select>
             </div>
-            <button class="btn-connect" @click="openSeialPort" id="connectActionBtn">🔌 连接</button>
-        </div>
+            <div id="button-area">
+                <button class="btn-refresh" @click="getAvailabelPorts" id="refreshActionBtn">刷新</button>
+                <text>|</text>
+                <button class="btn-connect" @click="openSeialPort" id="connectActionBtn">连接</button>
+            </div>
+            <!-- 状态栏和连接按钮 (无背景框) -->
+            <div class="control-bar">
+                <div class="status-text">
+                    状态: <span id="connStatus">未连接</span>
+                </div>
+            </div>
 
-        <!-- 原始数据调试区: 完全贴合屏幕底部且无边框分组容器 -->
-        <div class="rawdata-area">
-            <div class="raw-header">
-                <div class="raw-title">📟 原始数据流 (调试用)</div>
-            </div>
-            <div class="log-container">
-                <textarea v-model="receivedData" class="raw-log" id="rawLog" readonly wrap="on" placeholder="等待连接...&#10;点击「连接」模拟LoRa串口数据接收"></textarea>
+            <!-- 原始数据调试区: 完全贴合屏幕底部且无边框分组容器 -->
+            <div class="rawdata-area">
+                <div class="raw-header">
+                    <div class="raw-title">调试信息输出</div>
+                </div>
+                <div class="log-container">
+                    <textarea v-model="receivedData" class="raw-log" id="rawLog" readonly wrap="on" placeholder="等待连接...&#10;点击「连接」模拟LoRa串口数据接收"></textarea>
+                </div>
             </div>
         </div>
     </div>
-</div>
 </body>
 
 </template>
@@ -172,10 +178,6 @@ init();
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        .param-header:before {
-            content: "🌲";
-            font-size: 1.2rem;
         }
 
         /* 6列网格布局，完全贴合无装饰 */
@@ -234,6 +236,11 @@ init();
             padding-top: 4px;
         }
 
+        .serial-port-text {
+            font-size: 1rem;
+            padding-bottom: 8px;
+        }
+
         .status-text {
             font-size: 0.85rem;
             font-weight: 500;
@@ -247,21 +254,37 @@ init();
             color: #000000;
         }
 
-        .btn-connect {
+        .btn-refresh {
             background: #2c6e9e;
             border: none;
             font-weight: 600;
             font-size: 0.85rem;
             padding: 8px 28px;
-            border-radius: 30px;
+            border-radius: 10px;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            letter-spacing: 0.5px;
+        }
+        .btn-connect {
+            background: #4de071;
+            border: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 8px 28px;
+            border-radius: 10px;
             color: white;
             cursor: pointer;
             transition: 0.2s;
             letter-spacing: 0.5px;
         }
 
-        .btn-connect:hover {
+        .btn-refresh:hover {
             background: #1a4f73;
+        }
+
+        .btn-connect:hover {
+            background: #21862a;
         }
 
         .clear-log-btn {

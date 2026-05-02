@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "基于LoRa的森林气象因子监测系统（卢圣勇开发）",
+        "title": "基于LoRa的森林气象因子监测系统",
         "width": 1200,
         "height": 800
       }
