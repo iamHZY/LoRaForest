@@ -197,8 +197,8 @@ void StartDHT11Task(void *argument)
     {
 
         // 读取成功！这里可以加打印代码，或者把数据用到其他地方
-        sprintf(buffer, "Humidity: %d%%\r\n", dht11_data.humidity_int);
-        sprintf(buffer1,"Temperature: %dC\r\n", dht11_data.temp_int);
+        sprintf(buffer, "Humidity: %d%%;\r\n", dht11_data.humidity_int);
+        sprintf(buffer1,"Temperature: %dC;\r\n", dht11_data.temp_int);
         osMessageQueuePut(LoRAMsgQueueHandle, &buffer, 0, osWaitForever);  // 把DHT11数据放到消息队列里，等待发送任务取走发送
         osMessageQueuePut(LoRAMsgQueueHandle, &buffer1, 0, osWaitForever);
         //HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
@@ -245,7 +245,7 @@ void StartLightTask(void *argument)
     lightresult = HAL_ADC_GetValue(&hadc1);
     voltage = lightresult * 3300 / 4095;
 
-    sprintf(send_buf_light, "Light: %d;%d.%03dV\r\n", lightresult, voltage / 1000, voltage % 1000);
+    sprintf(send_buf_light, "Light: %d;\r\n", lightresult);
     osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_light, 0, osWaitForever);  // 把光照强度数据放到消息队列里，等待发送任务取走发送
     //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_light, strlen(send_buf_light), 20);
 
@@ -304,7 +304,7 @@ void StartRainTask(void *argument)
     rainresult = HAL_ADC_GetValue(&hadc2);
     voltage = rainresult * 3300 / 4095;
 
-    sprintf(send_buf_rain, "Rain:%d,%d.%03dV\r\n", rainresult, voltage / 1000, voltage % 1000);
+    sprintf(send_buf_rain, "Rain: %d;\r\n", rainresult);
     osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_rain, 0, osWaitForever);  // 把雨滴传感器数据放到消息队列里，等待发送任务取走发送
     //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_rain, strlen(send_buf_rain), 20);
 
