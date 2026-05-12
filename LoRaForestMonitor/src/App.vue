@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { Chart } from "chart.js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -11,8 +10,6 @@ let tempVal = ref("-");
 let presVal = ref("-");
 let rainVal = ref("-");
 let lightVal = ref("-");
-
-let tc = null;
 
 onMounted(async ()=>{
     await listen<string>("Humi", (event) =>{
@@ -48,24 +45,6 @@ async function getAvailabelPorts() {
     }
 }
 
-function initChart(){
-    const ctx = document.getElementById("chart-temp") as HTMLCanvasElement;
-    let labels = ['1', '2', '3'];
-    let data = {
-        label:labels,
-        datasets:[{
-            label:'标题',
-            data:[10, 22, 5],
-            fill: true,
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.3
-        }]
-    }
-    tc = new Chart(ctx, {
-        type:'line', data:data
-    });
-}
-
 async function openSeialPort() {
     let portlist = document.getElementById("port") as HTMLSelectElement;
     let btndiv = document.getElementById("button-area") as HTMLDivElement;
@@ -86,7 +65,6 @@ async function openSeialPort() {
 
 async function init() {
     getAvailabelPorts();
-    initChart();
 }
 
 init();

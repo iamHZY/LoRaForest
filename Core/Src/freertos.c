@@ -335,7 +335,7 @@ void StartpressureTask(void *argument)
     if (temp_c >= 0)
     {
       len = snprintf(tx_buffer, sizeof(tx_buffer),
-                "Press: %ld.%02ld hPa\r\n",
+                "Press: %ld.%02ld hPa;\r\n",
                 press_pa / 100, press_pa % 100);
     }
 

@@ -106,11 +106,11 @@ int main(void)
   /* USER CODE END 2 */
 
   /* Init scheduler */
-  //osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
-  //MX_FREERTOS_Init();
-  HAL_UART_Transmit(&huart1,"hello", 5, 1000);
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+  HAL_UART_Transmit(&huart1,"hello\r\n", 5, 1000);
   /* Start scheduler */
-  //osKernelStart();
+  osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
 
@@ -120,7 +120,7 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-  HAL_UART_Transmit(&huart1,"hello", 5, 1000);
+  //HAL_UART_Transmit(&huart1,"hello\r\n", 5, 1000);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
