@@ -7,11 +7,11 @@ use regex::Regex;
 fn analy_data(window: &tauri::Window, data: &String){
 
     //正则表达式
-    let temperature_re:Regex = Regex::new(r"Temperature:(\d+?)C").unwrap();
-    let rain_re:Regex = Regex::new(r"Rain:(\d+?),(.*?)V").unwrap();
-    let light_re:Regex = Regex::new(r"Light:(\d+)?;(.*?)V").unwrap();
-    let press_re:Regex = Regex::new(r"Press: (.*?) hPa").unwrap();
-    let humidity_re:Regex = Regex::new(r"Humidity: (\d+?)%").unwrap();
+    let temperature_re:Regex = Regex::new(r"Temperature: (\d+?)C;").unwrap();
+    let rain_re:Regex = Regex::new(r"Rain: (\d+?);").unwrap();
+    let light_re:Regex = Regex::new(r"Light: (\d+);").unwrap();
+    let press_re:Regex = Regex::new(r"Press: (.*?) hPa;").unwrap();
+    let humidity_re:Regex = Regex::new(r"Humidity: (\d+?)%;").unwrap();
 
     if let Some(cap) = temperature_re.captures(&data){
         let _ = window.emit("Temp", &cap[1]);
@@ -21,7 +21,7 @@ fn analy_data(window: &tauri::Window, data: &String){
         let _ = window.emit("Rain",format!("{:.2}", rain_adc * 33000.0 / 4095.0));
     }
     if let Some(cap) = light_re.captures(&data){
-        let light_adc: f64 = (&cap[2]).trim().parse().expect("");
+        let light_adc: f64 = (&cap[3]).trim().parse().expect("");
         let vol:f64 = light_adc * 3000.0 / 4095.0;
         let lux:f64 = 110.0 / vol;
         let _ = window.emit("Light", format!("{:.2}", lux));
