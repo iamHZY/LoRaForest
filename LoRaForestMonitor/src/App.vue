@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { Chart } from "chart.js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -10,6 +11,8 @@ let tempVal = ref("-");
 let presVal = ref("-");
 let rainVal = ref("-");
 let lightVal = ref("-");
+
+let tc = null;
 
 onMounted(async ()=>{
     await listen<string>("Humi", (event) =>{
@@ -28,12 +31,13 @@ onMounted(async ()=>{
         presVal.value = event.payload;
     });
     await listen<string>("serial-data", (event) =>{
+        console.log(event.payload);
         receivedData.value = event.payload + receivedData.value;
     });
 });
 
 async function getAvailabelPorts() {
-    let list:string[] = await invoke("getAvailabelPorts");
+    let list:string[] = await invoke("get_availabel_ports");
     let portlist = document.getElementById("port") as HTMLSelectElement;
     portlist.innerHTML = "";
     for (let i = 0; i < list.length; i++){
@@ -42,6 +46,24 @@ async function getAvailabelPorts() {
         option.textContent = list[i];
         portlist.appendChild(option);
     }
+}
+
+function initChart(){
+    const ctx = document.getElementById("chart-temp") as HTMLCanvasElement;
+    let labels = ['1', '2', '3'];
+    let data = {
+        label:labels,
+        datasets:[{
+            label:'标题',
+            data:[10, 22, 5],
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.3
+        }]
+    }
+    tc = new Chart(ctx, {
+        type:'line', data:data
+    });
 }
 
 async function openSeialPort() {
@@ -64,6 +86,7 @@ async function openSeialPort() {
 
 async function init() {
     getAvailabelPorts();
+    initChart();
 }
 
 init();
@@ -73,11 +96,10 @@ init();
 <template>
     <body>
     <div class="app-fullscreen">
-        <!-- 环境参数监测区域: 没有groupbox，没有容器边框 -->
         <div class="sensors-area">
             <div class="param-header">环境参数实时监测</div>
             
-            <!-- 传感器网格 6项: 光照/降雨/气温/气压/风速/湿度 -->
+            <!-- 传感器网格6项: 光照/降雨/气温/气压/湿度 -->
             <div class="sensor-grid">
                 <div class="sensor-card">
                     <div class="sensor-label">光照强度 (Lux)</div>
@@ -116,8 +138,6 @@ init();
                     状态: <span id="connStatus">未连接</span>
                 </div>
             </div>
-
-            <!-- 原始数据调试区: 完全贴合屏幕底部且无边框分组容器 -->
             <div class="rawdata-area">
                 <div class="raw-header">
                     <div class="raw-title">调试信息输出</div>
@@ -133,7 +153,7 @@ init();
 </template>
 
 <style>
-* {
+        * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -356,6 +376,17 @@ init();
             white-space: pre-wrap;
             word-break: break-all;
             overflow-y: auto;
+        }
+
+        .chart-container {
+            height: 90%;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .label-temp {
+            width: 100% !important;
+            height: 100% !important;
         }
 
         /* 响应式: 平板屏幕将网格转为3列 */

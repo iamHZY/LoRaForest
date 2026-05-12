@@ -1,16 +1,17 @@
 use std::{time::Duration};
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serialport::{self, DataBits, Parity, StopBits};
 use tauri::Emitter;
 use regex::Regex;
 
 //用于解析数据
 fn analy_data(window: &tauri::Window, data: &String){
-    let temperature_re:Regex = Regex::new(r"Temperature:(\d+)C").unwrap();
-    let rain_re:Regex = Regex::new(r"Rain:(\d+),(.*)V").unwrap();
-    let light_re:Regex = Regex::new(r"Light:(\d+);(.*)V").unwrap();
-    let press_re:Regex = Regex::new(r"Press: (.*) hPa").unwrap();
-    let humidity_re:Regex = Regex::new(r"Humidity: (\d+)%").unwrap();
+
+    //正则表达式
+    let temperature_re:Regex = Regex::new(r"Temperature:(\d+?)C").unwrap();
+    let rain_re:Regex = Regex::new(r"Rain:(\d+?),(.*?)V").unwrap();
+    let light_re:Regex = Regex::new(r"Light:(\d+)?;(.*?)V").unwrap();
+    let press_re:Regex = Regex::new(r"Press: (.*?) hPa").unwrap();
+    let humidity_re:Regex = Regex::new(r"Humidity: (\d+?)%").unwrap();
 
     if let Some(cap) = temperature_re.captures(&data){
         let _ = window.emit("Temp", &cap[1]);
@@ -45,15 +46,15 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
         Ok(mut p) =>{
             std::thread::spawn(move ||{
             let mut raw_buffer: [u8; 64] = [0; 64];
-            let mut line_Buffer: String = String::new();
+            let mut line_buffer: String = String::new();
             loop{
                 match &mut p.read(&mut raw_buffer){
                     Ok(len) =>{
                         if *len > 0 {
                             let chunk = String::from_utf8_lossy(&mut raw_buffer[0..*len]);
-                            line_Buffer.push_str(&chunk);
-                            if let Some(newLine) = line_Buffer.find("\n"){
-                                let complete_line = line_Buffer.drain(..=newLine).collect::<String>();
+                            line_buffer.push_str(&chunk);
+                            if let Some(new_line) = line_buffer.find("\n"){
+                                let complete_line = line_buffer.drain(..=new_line).collect::<String>();
                                 if !complete_line.is_empty(){
                                     let _ = window.emit("serial-data", &complete_line);
                                     analy_data(&window, &complete_line);
@@ -72,24 +73,24 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
 }
 
 #[tauri::command]
-fn getAvailabelPorts() -> Vec<String> {
-    let mut Ports_name = Vec::new();
+fn get_availabel_ports() -> Vec<String> {
+    let mut ports_name = Vec::new();
     match serialport::available_ports() {
         Ok(ports) => {
             for p in ports {
-                Ports_name.push(p.port_name);
+                ports_name.push(p.port_name);
             }
         },
         Err(e) => print!("Err")
     }
-    Ports_name
+    ports_name
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![getAvailabelPorts, start_reading])
+        .invoke_handler(tauri::generate_handler![get_availabel_ports, start_reading])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
