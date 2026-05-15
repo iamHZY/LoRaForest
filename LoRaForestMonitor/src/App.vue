@@ -4,6 +4,8 @@ import { Chart, registerables } from "chart.js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+Chart.register(...registerables);
+
 let isConnect = ref(false);
 let receivedData = ref("");
 let humiVal = ref("-");
@@ -12,38 +14,130 @@ let presVal = ref("-");
 let rainVal = ref("-");
 let lightVal = ref("-");
 
-let chartInstance: Chart | null = null;
+//图表控件实例
+let tempChartInstance: Chart | null = null;
+let rainChartInstance: Chart | null = null;
+let pressChartInstance: Chart | null = null;
+let lightChartInstance: Chart | null = null;
+let humiChartInstance: Chart | null = null;
 
-Chart.register(...registerables);
+//图表数据
+
+let tempChartLabels: string[] = [];
+let tempChartData: number[] = [];
+let rainChartLabels: string[] = [];
+let rainChartData: number[] = [];
+let pressChartLabels: string[] = [];
+let pressChartData: number[] = [];
+let lightChartLabels: string[] = [];
+let lightChartData: number[] = [];
+let humiChartLabels: string[] = [];
+let humiChartData: number[] = [];
+
+const MAX_DATA_ITEMS = 10;
 
 onMounted(async ()=>{
+    init();
     await listen<string>("Humi", (event) =>{
         humiVal.value = event.payload;
+        const nowTime = new Date().toLocaleDateString([], {
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        if (humiChartInstance){
+            humiChartInstance.data.labels?.push(nowTime.split(" ")[1]);
+            humiChartInstance.data.datasets[0].data.push(parseInt(event.payload));
+
+            if (humiChartData.length > MAX_DATA_ITEMS){
+                humiChartData.shift();
+                humiChartLabels.shift();
+            }
+            humiChartInstance.update();
+        }
     });
     await listen<string>("Temp", (event) =>{
         tempVal.value = event.payload;
+        const nowTime = new Date().toLocaleDateString([], {
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        if (tempChartInstance){
+            tempChartInstance.data.labels?.push(nowTime.split(" ")[1]);
+            tempChartInstance.data.datasets[0].data.push(parseInt(event.payload));
+
+            if (tempChartData.length > MAX_DATA_ITEMS){
+                tempChartData.shift();
+                tempChartLabels.shift();
+            }
+            tempChartInstance.update();
+        }
     });
     await listen<string>("Light", (event) =>{
         lightVal.value = event.payload;
+        const nowTime = new Date().toLocaleDateString([], {
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        if (lightChartInstance){
+            lightChartInstance.data.labels?.push(nowTime.split(" ")[1]);
+            lightChartInstance.data.datasets[0].data.push(parseFloat(event.payload));
+
+            if (lightChartData.length > MAX_DATA_ITEMS){
+                lightChartData.shift();
+                lightChartLabels.shift();
+            }
+            lightChartInstance.update();
+        }
     });
     await listen<string>("Rain", (event) =>{
         rainVal.value = event.payload;
+        const nowTime = new Date().toLocaleDateString([], {
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        if (rainChartInstance){
+            rainChartInstance.data.labels?.push(nowTime.split(" ")[1]);
+            rainChartInstance.data.datasets[0].data.push(parseFloat(event.payload));
+
+            if (rainChartData.length > MAX_DATA_ITEMS){
+                rainChartData.shift();
+                rainChartLabels.shift();
+            }
+            rainChartInstance.update();
+        }
     });
     await listen<string>("Pres", (event) =>{
         presVal.value = event.payload;
+        const nowTime = new Date().toLocaleDateString([], {
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        if (pressChartInstance){
+            pressChartInstance.data.labels?.push(nowTime.split(" ")[1]);
+            pressChartInstance.data.datasets[0].data.push(parseFloat(event.payload));
+
+            if (pressChartData.length > MAX_DATA_ITEMS){
+                pressChartData.shift();
+                pressChartLabels.shift();
+            }
+            pressChartInstance.update();
+        }
     });
     await listen<string>("serial-data", (event) =>{
-        console.log(event.payload);
+        //console.log(event.payload);
         receivedData.value = event.payload + receivedData.value;
     });
 
-    init();
 });
 
 async function getAvailabelPorts() {
     let list:string[] = await invoke("get_availabel_ports");
     let portlist = document.getElementById("port") as HTMLSelectElement;
-    portlist.innerHTML = "";
     for (let i = 0; i < list.length; i++){
         let option = document.createElement("Option");
         option.nodeValue = list[i];
@@ -71,22 +165,54 @@ async function openSeialPort() {
 }
 
 async function initChart() {
-    let ctx = document.getElementById("chart-temp") as HTMLCanvasElement;
+    let tempCtx = document.getElementById("chart-temp") as HTMLCanvasElement;
+    let rainCtx = document.getElementById("chart-rain") as HTMLCanvasElement;
+    let lightCtx = document.getElementById("chart-light") as HTMLCanvasElement;
+    let pressCtx = document.getElementById("chart-press") as HTMLCanvasElement;
+    let humiCtx = document.getElementById("chart-humi") as HTMLCanvasElement;
     
-    if (!ctx){
-        console.log("Not Found Canvas Element");
+    if (!tempCtx){
+        console.log("Not Found Temperature Canvas Element");
+        return;
+    }
+    if (!rainCtx){
+        console.log("Not Found Rain Canvas Element");
+        return;
+    }
+    if (!pressCtx){
+        console.log("Not Found Air Press Canvas Element");
+        return;
+    }
+    if (!lightCtx){
+        console.log("Not Found Light Canvas Element");
+        return;
+    }
+    if (!humiCtx){
+        console.log("Not Found Humidity Canvas Element");
         return;
     }
 
-    if (chartInstance){
-        chartInstance.destroy();
+    if (tempChartInstance){
+        tempChartInstance.destroy();
+    }
+    if (rainChartInstance){
+        rainChartInstance.destroy();
+    }
+    if (pressChartInstance){
+        pressChartInstance.destroy();
+    }
+    if (lightChartInstance){
+        lightChartInstance.destroy();
+    }
+    if (humiChartInstance){
+        humiChartInstance.destroy();
     }
 
-    let data = {
-        labels: ["T1", "T2", "T3"],
+    let tempData = {
+        labels: tempChartLabels,
         datasets:[{
-            label: "图表标题",
-            data: [21, 12, 3],
+            label: "温度",
+            data: tempChartData,
             fill: true,
             borderColor: 'rgb(75, 192, 192)',
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -97,9 +223,104 @@ async function initChart() {
         }]
     };
 
-    chartInstance = new Chart(ctx, {
+    let rainData = {
+        labels: rainChartLabels,
+        datasets:[{
+            label: "降雨量",
+            data: rainChartData,
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    };
+
+    let pressData = {
+        labels: pressChartLabels,
+        datasets:[{
+            label: "气压",
+            data: pressChartData,
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    };
+
+    let lightData = {
+        labels: lightChartLabels,
+        datasets:[{
+            label: "光照强度",
+            data: lightChartData,
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    };
+
+    let humiData = {
+        labels: humiChartLabels,
+        datasets:[{
+            label: "空气湿度",
+            data: humiChartData,
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    };
+
+    tempChartInstance = new Chart(tempCtx, {
         type: 'line',
-        data: data
+        data: tempData,
+        options: {
+            animation: false
+        }
+    });
+
+    rainChartInstance = new Chart(rainCtx, {
+        type: 'line',
+        data: rainData,
+        options: {
+            animation: false
+        }
+    });
+
+    pressChartInstance = new Chart(pressCtx, {
+        type: 'line',
+        data: pressData,
+        options: {
+            animation: false
+        }
+    });
+
+    lightChartInstance = new Chart(lightCtx, {
+        type: 'line',
+        data: lightData,
+        options: {
+            animation: false
+        }
+    });
+
+    humiChartInstance = new Chart(humiCtx, {
+        type: 'line',
+        data: humiData,
+        options: {
+            animation: false
+        }
     });
 }
 
@@ -116,7 +337,7 @@ async function init() {
         <div class="sensors-area">
             <div class="param-header">环境参数实时监测</div>
             
-            <!-- 传感器网格6项: 光照/降雨/气温/气压/湿度 -->
+            <!-- 传感器网格: 光照/降雨/气温/气压/湿度 -->
             <div class="sensor-grid">
                 <div class="sensor-card">
                     <div class="sensor-label">光照强度 (Lux)</div>
@@ -141,7 +362,7 @@ async function init() {
             </div>
 
             <div class="serial-port-text">
-                <lable for="port">串口</lable>
+                <label for="port">串口</label>
                 <select id="port"></select>
             </div>
             <div id="button-area">
@@ -164,7 +385,11 @@ async function init() {
                 </div>
             </div>
             <div class="chart-container">
-                <canvas id="chart-temp"></canvas>
+                <canvas class="chart" id="chart-temp"></canvas>
+                <canvas class="chart" id="chart-rain"></canvas>
+                <canvas class="chart" id="chart-press"></canvas>
+                <canvas class="chart" id="chart-light"></canvas>
+                <canvas class="chart" id="chart-humi"></canvas>
             </div>
         </div>
     </div>
@@ -173,7 +398,7 @@ async function init() {
 </template>
 
 <style>
-        * {
+      * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -220,10 +445,9 @@ async function init() {
             gap: 8px;
         }
 
-        /* 6列网格布局，完全贴合无装饰 */
         .sensor-grid {
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 18px 20px;
             margin-bottom: 20px;
         }
@@ -400,15 +624,19 @@ async function init() {
 
         /* 添加图表容器样式 */
         .chart-container {
-            width: 100%;
-            height: 300px;  /* 设置固定高度，宽度自适应 */
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 18px 20px;
+            width: 100vw;
+            height: 25vh;  /* 设置固定高度，宽度自适应 */
             margin-bottom: 20px;
+            margin-top: 40px;
             position: relative;
         }
 
-        .label-temp {
-            width: 100% !important;
-            height: 100% !important;
+        .chart {
+            width: 15vw;
+            height: 10vh;
         }
 
         /* 响应式: 平板屏幕将网格转为3列 */
