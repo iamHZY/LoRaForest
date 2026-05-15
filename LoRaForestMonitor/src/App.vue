@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { Chart, registerables } from "chart.js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -10,6 +11,10 @@ let tempVal = ref("-");
 let presVal = ref("-");
 let rainVal = ref("-");
 let lightVal = ref("-");
+
+let chartInstance: Chart | null = null;
+
+Chart.register(...registerables);
 
 onMounted(async ()=>{
     await listen<string>("Humi", (event) =>{
@@ -31,6 +36,8 @@ onMounted(async ()=>{
         console.log(event.payload);
         receivedData.value = event.payload + receivedData.value;
     });
+
+    init();
 });
 
 async function getAvailabelPorts() {
@@ -63,11 +70,43 @@ async function openSeialPort() {
     }
 }
 
-async function init() {
-    getAvailabelPorts();
+async function initChart() {
+    let ctx = document.getElementById("chart-temp") as HTMLCanvasElement;
+    
+    if (!ctx){
+        console.log("Not Found Canvas Element");
+        return;
+    }
+
+    if (chartInstance){
+        chartInstance.destroy();
+    }
+
+    let data = {
+        labels: ["T1", "T2", "T3"],
+        datasets:[{
+            label: "图表标题",
+            data: [21, 12, 3],
+            fill: true,
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.3,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointHoverRadius: 5
+        }]
+    };
+
+    chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: data
+    });
 }
 
-init();
+async function init() {
+    getAvailabelPorts();
+    initChart();
+}
 
 </script>
 
@@ -123,6 +162,9 @@ init();
                 <div class="log-container">
                     <textarea v-model="receivedData" class="raw-log" id="rawLog" readonly wrap="on" placeholder="等待连接...&#10;点击「连接」模拟LoRa串口数据接收"></textarea>
                 </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="chart-temp"></canvas>
             </div>
         </div>
     </div>
@@ -317,7 +359,7 @@ init();
             flex-direction: column;
             background: #0f1724;
             width: 100%;
-            height: 100%;
+            height: 30%;
             /* 无任何margin/padding让textarea紧贴边缘? 保留少许内边距提升可读性，但无容器边框 */
             padding: 12px 16px 16px 16px;
             overflow: hidden;
@@ -356,8 +398,10 @@ init();
             overflow-y: auto;
         }
 
+        /* 添加图表容器样式 */
         .chart-container {
-            height: 90%;
+            width: 100%;
+            height: 300px;  /* 设置固定高度，宽度自适应 */
             margin-bottom: 20px;
             position: relative;
         }
