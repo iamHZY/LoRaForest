@@ -287,7 +287,21 @@ async function initChart() {
         type: 'line',
         data: tempData,
         options: {
-            animation: false
+            animation: false,
+            scales:{
+                x:{
+                    title:{
+                        display: true,
+                        text: '时间'
+                    }
+                },
+                y:{
+                    title:{
+                        display: true,
+                        text: '气温(℃)'
+                    }
+                }
+            }
         }
     });
 
@@ -295,7 +309,21 @@ async function initChart() {
         type: 'line',
         data: rainData,
         options: {
-            animation: false
+            animation: false,
+            scales:{
+                x:{
+                    title:{
+                        display: true,
+                        text: '时间'
+                    }
+                },
+                y:{
+                    title:{
+                        display: true,
+                        text: '降雨量(mm/h)'
+                    }
+                }
+            }
         }
     });
 
@@ -303,7 +331,21 @@ async function initChart() {
         type: 'line',
         data: pressData,
         options: {
-            animation: false
+            animation: false,
+            scales:{
+                x:{
+                    title:{
+                        display: true,
+                        text: '时间'
+                    }
+                },
+                y:{
+                    title:{
+                        display: true,
+                        text: '气压(hPa)'
+                    }
+                }
+            }
         }
     });
 
@@ -311,7 +353,21 @@ async function initChart() {
         type: 'line',
         data: lightData,
         options: {
-            animation: false
+            animation: false,
+            scales:{
+                x:{
+                    title:{
+                        display: true,
+                        text: '时间'
+                    }
+                },
+                y:{
+                    title:{
+                        display: true,
+                        text: '光照强度(Lux)'
+                    }
+                }
+            }
         }
     });
 
@@ -319,7 +375,21 @@ async function initChart() {
         type: 'line',
         data: humiData,
         options: {
-            animation: false
+            animation: false,
+            scales:{
+                x:{
+                    title:{
+                        display: true,
+                        text: '时间'
+                    }
+                },
+                y:{
+                    title:{
+                        display: true,
+                        text: '湿度(%)'
+                    }
+                }
+            }
         }
     });
 }
