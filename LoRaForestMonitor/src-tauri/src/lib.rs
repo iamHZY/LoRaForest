@@ -1,7 +1,15 @@
-use std::{time::Duration};
+use std::{env, fs::{self, File, OpenOptions}, io::Write, path::Path, sync::Mutex, time::Duration};
 use serialport::{self, DataBits, Parity, StopBits};
 use tauri::Emitter;
 use regex::Regex;
+
+static OPENING: Mutex<bool> = Mutex::new(false);
+
+#[tauri::command]
+fn set_connecton_status(sta: bool){
+    let mut flag = OPENING.lock().unwrap();
+    *flag = sta;
+}
 
 //用于解析数据
 fn analy_data(window: &tauri::Window, data: &String){
@@ -9,8 +17,8 @@ fn analy_data(window: &tauri::Window, data: &String){
     //正则表达式
     let temperature_re: Regex = Regex::new(r"Temperature: (\d+?)C;").unwrap();
     let rain_re: Regex = Regex::new(r"Rain: (\d+?);").unwrap();
-    let light_re: Regex = Regex::new(r"Light: (\d+);").unwrap();
-    let press_re: Regex = Regex::new(r"Press: (.*?) hPa;").unwrap();
+    let light_re: Regex = Regex::new(r"Light: (\d+\.?\d*);").unwrap();
+    let press_re: Regex = Regex::new(r"Press: (\d+\.?\d*) hPa;").unwrap();
     let humidity_re: Regex = Regex::new(r"Humidity: (\d+?)%;").unwrap();
 
     if let Some(cap) = temperature_re.captures(&data){
@@ -18,8 +26,8 @@ fn analy_data(window: &tauri::Window, data: &String){
     }
     if let Some(cap) = rain_re.captures(&data){
         let rain_adc: f64 = (&cap[1]).trim().parse().expect("");
-        let rain_ph = (3940.0 - rain_adc ).abs() / 100.0;
-        let rain = if rain_ph > 1.0 {rain_ph} else {0.0};
+        let rain_ph:f64 = (3940.0 - rain_adc ).abs() / 100.0;
+        let rain:f64 = if rain_ph > 1.0 {rain_ph} else {0.0};
         let _ = window.emit("Rain",format!("{:.2}", rain));
     }
     if let Some(cap) = light_re.captures(&data){
@@ -45,12 +53,23 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
     .stop_bits(StopBits::One)
     .timeout(Duration::from_millis(1000))
     .parity(Parity::None);
+    set_connecton_status(true);
     match serial_port.open(){
         Ok(mut p) =>{
             std::thread::spawn(move ||{
             let mut raw_buffer: [u8; 64] = [0; 64];
             let mut line_buffer: String = String::new();
-            loop{
+            let savepath = Path::new("D:\\Applications\\loraforest_monitor\\data");
+            if !savepath.exists() || savepath.is_dir(){
+                match File::create(savepath){
+                    Ok(b) => {},
+                    Err(e) =>{
+                        let _ = window.emit("error", e.to_string());
+                    }
+                }
+            }
+            let mut sf = OpenOptions::new().append(true).open(savepath).unwrap();
+            while *OPENING.lock().unwrap() {
                 match &mut p.read(&mut raw_buffer){
                     Ok(len) =>{
                         if *len > 0 {
@@ -60,23 +79,29 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
                                 let complete_line = line_buffer.drain(..=new_line).collect::<String>();
                                 if !complete_line.is_empty(){
                                     let _ = window.emit("serial-data", &complete_line);
+                                    sf.write(&complete_line.as_bytes()).unwrap();
                                     analy_data(&window, &complete_line);
                                 }
                             }
                         }
                     },
-                    Err(e) =>{}
+                    Err(e) =>{
+                        let _ = window.emit("error", e.to_string());
+                    }
                 }
             }
         });
         return true;
         },
-        Err(e) => false
+        Err(e) =>{
+            let _ = window.emit("error", e.to_string());
+            false
+        }
     }
 }
 
 #[tauri::command]
-fn get_availabel_ports() -> Vec<String> {
+fn get_availabel_ports(window: tauri::Window) -> Vec<String> {
     let mut ports_name = Vec::new();
     match serialport::available_ports() {
         Ok(ports) => {
@@ -84,7 +109,9 @@ fn get_availabel_ports() -> Vec<String> {
                 ports_name.push(p.port_name);
             }
         },
-        Err(e) => print!("Err")
+        Err(e) =>{
+            let _ = window.emit("error", e.to_string());
+        }
     }
     ports_name
 }
@@ -93,7 +120,7 @@ fn get_availabel_ports() -> Vec<String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_availabel_ports, start_reading])
+        .invoke_handler(tauri::generate_handler![get_availabel_ports, start_reading,set_connecton_status])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

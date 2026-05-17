@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "loraforest_monitor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "identifier": "com.ricardo.loraforest.monitor",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "基于LoRa的森林气象因子监测系统",
-        "width": 1200,
+        "width": 1380,
         "height": 800
       }
     ],
