@@ -1,4 +1,5 @@
-use std::{env, fs::{self, File, OpenOptions}, io::Write, path::Path, sync::Mutex, time::Duration};
+use std::{env, fs::{File, OpenOptions}, io::Write, path::Path, sync::Mutex, time::Duration};
+use chrono::Local;
 use serialport::{self, DataBits, Parity, StopBits};
 use tauri::Emitter;
 use regex::Regex;
@@ -55,14 +56,14 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
     .parity(Parity::None);
     set_connecton_status(true);
     match serial_port.open(){
-        Ok(mut p) =>{
+        Ok(mut p) => {
             std::thread::spawn(move ||{
             let mut raw_buffer: [u8; 64] = [0; 64];
             let mut line_buffer: String = String::new();
-            let savepath = Path::new("D:\\Applications\\loraforest_monitor\\data");
+            let savepath = Path::new("data");
             if !savepath.exists() || savepath.is_dir(){
                 match File::create(savepath){
-                    Ok(b) => {},
+                    Ok(_) => {},
                     Err(e) =>{
                         let _ = window.emit("error", e.to_string());
                     }
@@ -76,8 +77,10 @@ fn start_reading(window: tauri::Window, port: String) -> bool{
                             let chunk = String::from_utf8_lossy(&mut raw_buffer[0..*len]);
                             line_buffer.push_str(&chunk);
                             if let Some(new_line) = line_buffer.find("\n"){
-                                let complete_line = line_buffer.drain(..=new_line).collect::<String>();
-                                if !complete_line.is_empty(){
+                                let now = Local::now().format("[%Y/%m/%d-%H:%M:%S]");
+                                let mut complete_line = now.to_string();
+                                complete_line.push_str(&line_buffer.drain(..=new_line).collect::<String>());
+                                if !complete_line.len() - now.to_string().len() > 0{
                                     let _ = window.emit("serial-data", &complete_line);
                                     sf.write(&complete_line.as_bytes()).unwrap();
                                     analy_data(&window, &complete_line);
