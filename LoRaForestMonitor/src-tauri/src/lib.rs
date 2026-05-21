@@ -1,10 +1,11 @@
-use std::{env, fs::{File, OpenOptions}, io::Write, path::Path, sync::Mutex, time::Duration};
-use chrono::Local;
-use serialport::{self, DataBits, Parity, StopBits};
+use std::{env, io::Write, sync::Mutex};
 use tauri::Emitter;
 use regex::Regex;
+use std::net::TcpStream;
+use std::io::Read;
 
 static OPENING: Mutex<bool> = Mutex::new(false);
+static CMD_BUFFER: Mutex<String> = Mutex::new(String::new());
 
 #[tauri::command]
 fn set_connecton_status(sta: bool){
@@ -13,7 +14,7 @@ fn set_connecton_status(sta: bool){
 }
 
 //用于解析数据
-fn analy_data(window: &tauri::Window, data: &String){
+fn analy_data(window: &tauri::Window, data: String){
 
     //正则表达式
     let temperature_re: Regex = Regex::new(r"Temperature: (\d+?)C;").unwrap();
@@ -47,83 +48,109 @@ fn analy_data(window: &tauri::Window, data: &String){
     }
 }
 
-#[tauri::command]
-fn start_reading(window: tauri::Window, port: String) -> bool{
-    let serial_port = serialport::new(port, 115200)
-    .data_bits(DataBits::Eight)
-    .stop_bits(StopBits::One)
-    .timeout(Duration::from_millis(1000))
-    .parity(Parity::None);
-    set_connecton_status(true);
-    match serial_port.open(){
-        Ok(mut p) => {
-            std::thread::spawn(move ||{
-            let mut raw_buffer: [u8; 64] = [0; 64];
-            let mut line_buffer: String = String::new();
-            let savepath = Path::new("data");
-            if !savepath.exists() || savepath.is_dir(){
-                match File::create(savepath){
-                    Ok(_) => {},
-                    Err(e) =>{
-                        let _ = window.emit("error", e.to_string());
-                    }
-                }
-            }
-            let mut sf = OpenOptions::new().append(true).open(savepath).unwrap();
-            while *OPENING.lock().unwrap() {
-                match &mut p.read(&mut raw_buffer){
-                    Ok(len) =>{
-                        if *len > 0 {
-                            let chunk = String::from_utf8_lossy(&mut raw_buffer[0..*len]);
-                            line_buffer.push_str(&chunk);
-                            if let Some(new_line) = line_buffer.find("\n"){
-                                let now = Local::now().format("[%Y/%m/%d-%H:%M:%S]");
-                                let mut complete_line = now.to_string();
-                                complete_line.push_str(&line_buffer.drain(..=new_line).collect::<String>());
-                                if !complete_line.len() - now.to_string().len() > 0{
-                                    let _ = window.emit("serial-data", &complete_line);
-                                    sf.write(&complete_line.as_bytes()).unwrap();
-                                    analy_data(&window, &complete_line);
-                                }
-                            }
-                        }
-                    },
-                    Err(e) =>{
-                        let _ = window.emit("error", e.to_string());
-                    }
-                }
-            }
-        });
-        return true;
-        },
-        Err(e) =>{
-            let _ = window.emit("error", e.to_string());
+// TCP通信
+fn recive_data(stream: &TcpStream) -> String {
+    let mut stream = stream;
+    let mut buffer = [0; 128];
+    let size = stream.read(&mut buffer).unwrap();
+    String::from_utf8_lossy(&mut buffer[..size]).to_string()
+}
+
+fn send_data(stream: &TcpStream, data: &[u8]) -> bool{
+    let mut stream = stream;
+    match stream.write(&data){
+        Ok(_) => true,
+        Err(e) => {
+            println!("发送失败，{}", e.to_string());
             false
         }
     }
 }
 
-#[tauri::command]
-fn get_availabel_ports(window: tauri::Window) -> Vec<String> {
-    let mut ports_name = Vec::new();
-    match serialport::available_ports() {
-        Ok(ports) => {
-            for p in ports {
-                ports_name.push(p.port_name);
+fn tcp_receive_handle(window: tauri::Window, stream: TcpStream) {
+    std::thread::spawn(move || {
+        loop {
+            if !*OPENING.lock().unwrap() {
+                break;
+            }
+            let data = recive_data(&stream);
+            let _ = window.emit("serial-data", &data);
+            analy_data(&window, data.clone());
+        }
+    });
+}
+
+fn tcp_send_handle(stream: TcpStream) {
+    std::thread::spawn(move || {
+        loop {
+            if !*OPENING.lock().unwrap() {
+                send_data(&stream, b"Disconnect");
+                break;
+            }
+            if !(*CMD_BUFFER.lock().unwrap()).is_empty() {
+                send_data(&stream, (*CMD_BUFFER.lock().unwrap()).as_bytes());
+                (*CMD_BUFFER.lock().unwrap()).clear();
+            }
+        }
+    });
+}
+
+fn start_tcp_server(window: tauri::Window, addr: String) {
+    match TcpStream::connect(addr){
+        Ok(send_stream) => {
+            let receive_stream = send_stream.try_clone().unwrap();
+            //与客户端握手认证
+            send_data(&send_stream, b"It's from LoRaForest Client!");
+            let data = recive_data(&send_stream);
+            if data == "It's from LoRaForest Server!" {
+                send_data(&send_stream, b"Ok");
+                set_connecton_status(true);
+                let _ = window.emit("connect-status", true);
+                tcp_receive_handle(window, receive_stream);
+                tcp_send_handle(send_stream);
             }
         },
-        Err(e) =>{
+        Err(e) => {
             let _ = window.emit("error", e.to_string());
         }
-    }
-    ports_name
+    };
+}
+
+
+#[tauri::command]
+fn start_reading(window: tauri::Window, port: String){
+    start_tcp_server(window, port);
+    /* 
+    let mut stream = TcpStream::connect(port).unwrap();
+    let message = b"It's from LoRaForest Client!";
+    stream.write(message).unwrap();
+
+    std::thread::spawn(move || {
+        let mut buffer = [0; 128];
+        let mut size = stream.read(&mut buffer).unwrap();
+        let mut data = String::from_utf8_lossy(&buffer[..size]);
+        if data == "It's from LoRaForest Server!" {
+            let _ = window.emit("connect-status", true);
+            stream.write(b"Ok").unwrap();
+            set_connecton_status(true);
+            loop {
+                size = stream.read(&mut buffer).unwrap();
+                data = String::from_utf8_lossy(&buffer[..size]);
+                let _ = window.emit("serial-data", &data);
+                analy_data(&window, &data.to_string());
+                if !*OPENING.lock().unwrap() {
+                    stream.write(b"Disconnect").unwrap();
+                }
+            }
+        }
+    });*/
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_availabel_ports, start_reading,set_connecton_status])
+        .invoke_handler(tauri::generate_handler![start_reading,set_connecton_status])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

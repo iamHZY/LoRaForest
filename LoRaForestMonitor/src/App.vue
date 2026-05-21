@@ -130,39 +130,33 @@ onMounted(async ()=>{
         console.log(event.payload);
     });
 
+    await listen<string>("connect-status", (event) => {
+        if (event.payload == "true") {
+            isConnect.value = true;
+        }else{
+            isConnect.value = false;
+        }
+    });
+
     await listen<string>("error", (event) => {
         console.log("Backend Error: "+ event.payload);
     });
 
 });
 
-async function getAvailabelPorts() {
-    let list:string[] = await invoke("get_availabel_ports");
-    let portlist = document.getElementById("port") as HTMLSelectElement;
-    portlist.innerHTML = "";
-    for (let i = 0; i < list.length; i++){
-        let option = document.createElement("Option");
-        option.nodeValue = list[i];
-        option.textContent = list[i];
-        portlist.appendChild(option);
-    }
-}
-
 async function openSeialPort() {
-    let portlist = document.getElementById("port") as HTMLSelectElement;
+    let portlist = document.getElementById("port") as HTMLInputElement;
     let connectButton = document.getElementById("connectActionBtn") as HTMLButtonElement;
     let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
-    let port = portlist.options[portlist.selectedIndex].text;
+    let port = portlist.value;
+    console.log(port);
     if (!isConnect.value){
-        if (await invoke("start_reading", {port: port})){
-            isConnect.value = true;
-            connectStatus.textContent = "已连接" + port;
-            connectButton.textContent = "断开";
-            connectButton.className = "btn-disconnect";
-            portlist.disabled = true;
-        }else{
-            alert(port + "打开失败");
-        }
+        await invoke("start_reading", {port: port});
+        isConnect.value = true;
+        connectStatus.textContent = "已连接" + port;
+        connectButton.textContent = "断开";
+        connectButton.className = "btn-disconnect";
+        portlist.disabled = true;
     }else{
         await invoke("set_connecton_status", {sta: false});
         isConnect.value = false;
@@ -404,7 +398,6 @@ async function initChart() {
 }
 
 async function init() {
-    getAvailabelPorts();
     initChart();
 }
 
@@ -441,11 +434,10 @@ async function init() {
                 </div>
 
                 <div class="serial-port-text">
-                    <label for="port">串口</label>
-                    <select id="port"></select>
+                    <label for="port">服务器地址：</label>
+                    <input id="port"></input>
                 </div>
                 <div id="button-area">
-                    <button class="btn-refresh" @click="getAvailabelPorts" id="refreshActionBtn">刷新</button>
                     <button class="btn-connect" @click="openSeialPort" id="connectActionBtn">连接</button>
                 </div>
                 <!-- 状态栏和连接按钮 (无背景框) -->
