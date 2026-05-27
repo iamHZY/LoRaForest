@@ -131,39 +131,49 @@ onMounted(async ()=>{
     });
 
     await listen<string>("connect-status", (event) => {
+        let connectButton = document.getElementById("connectActionBtn") as HTMLButtonElement;
+        let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
+        let portlist = document.getElementById("port") as HTMLInputElement;
         if (event.payload == "true") {
             isConnect.value = true;
+            connectStatus.textContent = "已连接";
+            connectButton.textContent = "断开";
+            connectButton.className = "btn-disconnect";
+            portlist.disabled = true;
         }else{
             isConnect.value = false;
+            connectStatus.textContent = "未连接";
+            connectButton.textContent = "连接";
+            connectButton.className = "btn-connect";
+            portlist.disabled = false;
         }
     });
 
     await listen<string>("error", (event) => {
+        let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
         console.log("Backend Error: "+ event.payload);
+        connectStatus.textContent = "出现错误: " + event.payload;
     });
 
 });
 
 async function openSeialPort() {
     let portlist = document.getElementById("port") as HTMLInputElement;
-    let connectButton = document.getElementById("connectActionBtn") as HTMLButtonElement;
-    let connectStatus = document.getElementById("connStatus") as HTMLSpanElement;
     let port = portlist.value;
     console.log(port);
     if (!isConnect.value){
+        if (port.length == 0){
+            alert("请输入服务器地址");
+            return;
+        }
+        const v4addr_re = /(\d+)\.(\d+)\.(\d+)\.(\d+):?(\d*?)/;
+        if (!v4addr_re.test(port)){
+            alert("地址非法");
+            return;
+        }
         await invoke("start_reading", {port: port});
-        isConnect.value = true;
-        connectStatus.textContent = "已连接" + port;
-        connectButton.textContent = "断开";
-        connectButton.className = "btn-disconnect";
-        portlist.disabled = true;
     }else{
         await invoke("set_connecton_status", {sta: false});
-        isConnect.value = false;
-        connectStatus.textContent = "未连接";
-        connectButton.textContent = "连接";
-        connectButton.className = "btn-connect";
-        portlist.disabled = false;
     }
 }
 
