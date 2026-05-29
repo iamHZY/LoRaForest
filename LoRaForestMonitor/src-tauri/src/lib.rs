@@ -51,7 +51,7 @@ fn analy_data(window: &tauri::Window, data: String) {
 // TCP通信
 fn recive_data(stream: &TcpStream) -> String {
     let mut stream = stream;
-    let mut buffer = [0; 128];
+    let mut buffer = [0; 64];
     let size = stream.read(&mut buffer).unwrap();
     String::from_utf8_lossy(&mut buffer[..size]).to_string()
 }
