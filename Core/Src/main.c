@@ -100,15 +100,13 @@ int main(void)
   MX_I2C1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
- // __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
-
 
   /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
-  HAL_UART_Transmit(&huart1,"hello\r\n", 5, 1000);
+  
   /* Start scheduler */
   osKernelStart();
 

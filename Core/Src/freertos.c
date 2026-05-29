@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "cmsis_os2.h"
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
@@ -199,8 +200,8 @@ void StartDHT11Task(void *argument)
         // 读取成功！这里可以加打印代码，或者把数据用到其他地方
         sprintf(buffer, "Humidity: %d%%;\r\n", dht11_data.humidity_int);
         sprintf(buffer1,"Temperature: %dC;\r\n", dht11_data.temp_int);
-        osMessageQueuePut(LoRAMsgQueueHandle, &buffer, 0, osWaitForever);  // 把DHT11数据放到消息队列里，等待发送任务取走发送
-        osMessageQueuePut(LoRAMsgQueueHandle, &buffer1, 0, osWaitForever);
+        osMessageQueuePut(LoRAMsgQueueHandle, buffer, 0, osWaitForever);  // 把DHT11数据放到消息队列里，等待发送任务取走发送
+        osMessageQueuePut(LoRAMsgQueueHandle, buffer1, 0, osWaitForever);
         //HAL_UART_Transmit(&huart1, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
     
     }
@@ -233,7 +234,6 @@ void StartLightTask(void *argument)
   /* USER CODE BEGIN StartLightTask */
 
   int lightresult = 0;
-  int voltage = 0;
   char send_buf_light[25];
   HAL_ADC_Start(&hadc1);
 
@@ -243,10 +243,9 @@ void StartLightTask(void *argument)
   {
     osDelay(500);
     lightresult = HAL_ADC_GetValue(&hadc1);
-    voltage = lightresult * 3300 / 4095;
 
     sprintf(send_buf_light, "Light: %d;\r\n", lightresult);
-    osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_light, 0, osWaitForever);  // 把光照强度数据放到消息队列里，等待发送任务取走发送
+    osMessageQueuePut(LoRAMsgQueueHandle, send_buf_light, 0, osWaitForever);  // 把光照强度数据放到消息队列里，等待发送任务取走发送
     //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_light, strlen(send_buf_light), 20);
 
 
@@ -264,16 +263,14 @@ void StartLightTask(void *argument)
 void StartSendMassageTask(void *argument)
 {
   /* USER CODE BEGIN StartSendMassageTask */
-  uint8_t send_buf[25];
-
-
+  static uint8_t send_buf[50];
   /* Infinite loop */
   for(;;)
   {
-    osMessageQueueGet(LoRAMsgQueueHandle, &send_buf, 0, osWaitForever);
+    osMessageQueueGet(LoRAMsgQueueHandle, send_buf, 0, osWaitForever);
     HAL_UART_Transmit(&huart1, (uint8_t*)send_buf, strlen((char*)send_buf), HAL_MAX_DELAY);  // 从消息队列里取数据发送出去，发送完了就等下一条消息
 
-    osDelay(50);  
+    osDelay(100);
 
   }
   /* USER CODE END StartSendMassageTask */
@@ -291,7 +288,6 @@ void StartRainTask(void *argument)
   /* USER CODE BEGIN StartRainTask */
 
   int rainresult = 0;
-  int voltage = 0;
   char send_buf_rain[25];
   HAL_ADC_Start(&hadc2);
 
@@ -302,10 +298,9 @@ void StartRainTask(void *argument)
     //HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_5);
     osDelay(1000);
     rainresult = HAL_ADC_GetValue(&hadc2);
-    voltage = rainresult * 3300 / 4095;
 
     sprintf(send_buf_rain, "Rain: %d;\r\n", rainresult);
-    osMessageQueuePut(LoRAMsgQueueHandle, &send_buf_rain, 0, osWaitForever);  // 把雨滴传感器数据放到消息队列里，等待发送任务取走发送
+    osMessageQueuePut(LoRAMsgQueueHandle, send_buf_rain, 0, osWaitForever);  // 把雨滴传感器数据放到消息队列里，等待发送任务取走发送
     //HAL_UART_Transmit(&huart1, (uint8_t*) send_buf_rain, strlen(send_buf_rain), 20);
 
 
@@ -345,10 +340,10 @@ void StartpressureTask(void *argument)
       
       int32_t t_abs = -temp_c;
       len = snprintf(tx_buffer, sizeof(tx_buffer),
-              "Press: %ld.%02ld hPa\r\n",
+              "Press: %ld.%02ld hPa;\r\n",
               press_pa / 100, press_pa % 100);
     }
-    osMessageQueuePut(LoRAMsgQueueHandle, &tx_buffer, 0, osWaitForever);  // 把BMP280数据放到消息队列里，等待发送任务取走发送
+    osMessageQueuePut(LoRAMsgQueueHandle, tx_buffer, 0, osWaitForever);  // 把BMP280数据放到消息队列里，等待发送任务取走发送
     osDelay(500);
   }
   /* USER CODE END StartpressureTask */
